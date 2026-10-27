@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MediBridge - Medicine Shortage Prediction</title>
+<style>
+  body{font-family:system-ui,Arial,sans-serif;margin:0;background:#f4f6f8;color:#1c2733}
+  header{background:#0b5c73;color:#fff;padding:16px}
+  header h1{margin:0;font-size:1.2rem} header p{margin:4px 0 0;font-size:.85rem;opacity:.9}
+  main{padding:12px;max-width:1000px;margin:auto}
+  h2{font-size:1.05rem;margin:22px 0 8px}
+  .card{background:#fff;border-radius:10px;padding:12px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+  .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.75rem;color:#fff}
+  .HIGH{background:#c62828}.MEDIUM{background:#ef8f00}.LOW{background:#2e7d32}.near{background:#6a1b9a}
+  .scroll{overflow-x:auto} table{border-collapse:collapse;width:100%;font-size:.85rem;background:#fff}
+  th,td{padding:6px 8px;border-bottom:1px solid #e3e8ec;text-align:left;white-space:nowrap}
+  th{background:#e8eef2} small{color:#566573}
+</style>
+</head>
+<body>
+<header>
+  <h1>MediBridge: Medicine Shortage Prediction &amp; Hospital Sharing</h1>
+  <p id="note">Loading...</p>
+</header>
+<main>
+  <h2>Shortage alerts and recommended hospitals</h2>
+  <div id="recs"></div>
+  <h2>Near-expiry stock (redistribution candidates)</h2>
+  <div id="expiry"></div>
+  <h2>All predictions</h2>
+  <div class="scroll"><table id="preds"></table></div>
+</main>
+<script>
+fetch("/api/dashboard").then(r => r.json()).then(d => {
+  document.getElementById("note").textContent = d.note;
+  const recs = document.getElementById("recs");
+  recs.innerHTML = d.recommendations.length ? "" : "<p>No shortages predicted.</p>";
+  d.recommendations.forEach(r => {
+    const sup = r.suppliers.map(s =>
+      `<li>${s.hospital}: <b>${s.units}</b> units, ${s.distance_km} km, expiry ${s.expiry_date}` +
+      (s.near_expiry ? ' <span class="badge near">near expiry</span>' : '') + `</li>`).join("");
+    recs.innerHTML += `<div class="card"><span class="badge ${r.risk}">${r.risk}</span>
+      <b>${r.hospital}</b>: ${r.medicine}<br>
+      <small>${r.days_of_stock} days of stock left. Needs ${r.units_needed} units
+      (${r.fully_covered ? "fully covered" : "partly covered: " + r.units_covered}).</small>
+      <ul>${sup || "<li>No suitable donor hospital found</li>"}</ul></div>`;
+  });
+  const ex = document.getElementById("expiry");
+  ex.innerHTML = d.near_expiry.length ? "" : "<p>No near-expiry risk.</p>";
+  d.near_expiry.forEach(e => {
+    ex.innerHTML += `<div class="card"><b>${e.hospital}</b>: ${e.medicine}<br>
+      <small>Expires ${e.expiry_date} (${e.days_to_expiry} days). About ${e.units_likely_wasted} units
+      may go unused.</small></div>`;
+  });
+  let t = "<tr><th>Hospital</th><th>Medicine</th><th>Stock</th><th>Forecast 14d</th><th>Days left</th><th>Lead time</th><th>Risk</th></tr>";
+  d.predictions.forEach(p => {
+    t += `<tr><td>${p.hospital}</td><td>${p.medicine}</td><td>${p.stock}</td><td>${p.forecast_14d}</td>
+      <td>${p.days_of_stock}</td><td>${p.lead_time_days}d</td><td><span class="badge ${p.risk}">${p.risk}</span></td></tr>`;
+  });
+  document.getElementById("preds").innerHTML = t;
+});
+</script>
+</body>
+</html>
